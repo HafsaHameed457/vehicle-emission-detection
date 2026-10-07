@@ -1,1 +1,16 @@
-plan.md
+# Virtual environment
+venv/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Model weights (large files)
+*.pt
+
+# Output files
+output/
+
+# OS files
+.DS_Store
+Thumbs.db
