@@ -61,7 +61,7 @@ for video_name, emissions in emissions_data.items():  # Iterate over each video
 m = folium.Map(
     location=[51.5074, -0.1278],  # Center coordinates (London)
     zoom_start=5,  # Initial zoom level (1=world, 18=street)
-    tiles="OpenStreetMap",  # Map tile style
+    tiles="CartoDB positron",  # Map tile style (free, no usage policy issues)
 )
 
 # --- Step 8: Add heatmap layer ---
