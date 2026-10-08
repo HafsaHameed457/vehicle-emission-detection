@@ -11,6 +11,9 @@ __pycache__/
 # Output files
 output/
 
+# Video files (too large for GitHub)
+data/
+
 # OS files
 .DS_Store
 Thumbs.db
