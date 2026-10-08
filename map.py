@@ -61,7 +61,8 @@ for video_name, emissions in emissions_data.items():  # Iterate over each video
 m = folium.Map(
     location=[51.5074, -0.1278],  # Center coordinates (London)
     zoom_start=5,  # Initial zoom level (1=world, 18=street)
-    tiles="CartoDB positron",  # Map tile style (free, no usage policy issues)
+    tiles="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",  # Direct CartoDB URL (no API key needed)
+    attr="&copy; <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap</a> contributors &copy; <a href='https://carto.com/attributions'>CARTO</a>",  # Required attribution
 )
 
 # --- Step 8: Add heatmap layer ---
