@@ -1,97 +1,117 @@
-# emissions.py — Estimate CO2 and NOx emissions from vehicle counts
-# This script reads the vehicle counts from output/all_counts.json,
-# applies emission factors per vehicle type, and calculates
-# total estimated emissions for each video.
+# emissions.py — Calculate CO2 emissions from vehicle counts
+# This script reads output/all_counts.json, applies emission factors,
+# and simulates an EV adoption scenario.
 
 # --- Step 1: Import required libraries ---
-import json  # For reading the counts JSON file
+import json  # For reading/writing JSON files
 import os  # For file path operations
 
-# --- Step 2: Define emission factors (grams per vehicle per km) ---
-# These are approximate average emission factors from literature
-# Source: EEA (European Environment Agency) and EPA guidelines
+# --- Step 2: Define file paths ---
+COUNTS_FILE = os.path.join("output", "all_counts.json")  # Input: vehicle counts
+OUTPUT_FILE = os.path.join("output", "emissions.json")  # Output: emissions data
+
+# --- Step 3: Define emission factors (g CO2 per km) ---
+# These are average emission factors per vehicle class
 EMISSION_FACTORS = {
-    "car": {
-        "co2": 120.0,  # Average car emits ~120g CO2 per km
-        "nox": 0.05,   # Average car emits ~0.05g NOx per km
-    },
-    "motorcycle": {
-        "co2": 80.0,   # Average motorcycle emits ~80g CO2 per km
-        "nox": 0.03,   # Average motorcycle emits ~0.03g NOx per km
-    },
-    "bus": {
-        "co2": 650.0,  # Average bus emits ~650g CO2 per km
-        "nox": 3.5,    # Average bus emits ~3.5g NOx per km
-    },
-    "truck": {
-        "co2": 800.0,  # Average truck emits ~800g CO2 per km
-        "nox": 4.0,    # Average truck emits ~4.0g NOx per km
-    },
+    "car": 147,  # Average car emits 147g CO2/km
+    "bus": 1071,  # Average bus emits 1071g CO2/km
+    "truck": 800,  # Average truck emits 800g CO2/km
+    "motorcycle": 120,  # Average motorcycle emits 120g CO2/km
 }
 
-# --- Step 3: Define average trip distance per vehicle (km) ---
-# This is an assumption — adjust based on your study area
-AVG_TRIP_DISTANCE_KM = 5.0  # Assume each vehicle travels ~5 km in the video
+# --- Step 4: Define trip distance assumption ---
+# Each vehicle travels 0.1 km within camera view
+TRIP_DISTANCE_KM = 0.1  # Distance in kilometers
 
-# --- Step 4: Define file paths ---
-COUNTS_FILE = os.path.join("output", "all_counts.json")  # Input: vehicle counts
-OUTPUT_FILE = os.path.join("output", "emissions.json")  # Output: emission estimates
+# --- Step 5: Define EV scenario parameters ---
+EV_REPLACEMENT_RATE = 0.30  # 30% of cars replaced with EVs
+EV_EMISSION_FACTOR = 0  # EVs emit 0g CO2/km (tailpipe)
 
-# --- Step 5: Read vehicle counts from JSON file ---
-with open(COUNTS_FILE, "r") as f:  # Open the counts file for reading
-    all_counts = json.load(f)  # Load JSON data into a Python dictionary
+# --- Step 6: Load vehicle counts from JSON file ---
+with open(COUNTS_FILE, "r") as f:  # Open counts file for reading
+    counts_data = json.load(f)  # Load JSON data into a Python dictionary
 
-# --- Step 6: Dictionary to store emission results ---
-emissions_results = {}  # Will store {video_name: {vehicle_type: {co2, nox}}}
+# --- Step 7: Aggregate counts across all videos ---
+# Initialize total counts for each vehicle type to 0
+total_counts = {"car": 0, "bus": 0, "truck": 0, "motorcycle": 0}
 
-# --- Step 7: Loop through each video's counts ---
-for video_name, vehicle_counts in all_counts.items():  # Iterate over each video
-    print(f"\nCalculating emissions for: {video_name}")
+# Loop through each video's counts and sum them up
+for video_name, video_counts in counts_data.items():  # Iterate over each video
+    for vehicle_type in total_counts:  # For each vehicle type
+        # Add the count for this video, default to 0 if key missing
+        total_counts[vehicle_type] += video_counts.get(vehicle_type, 0)
 
-    # Initialize dictionary for this video's emissions
-    video_emissions = {
-        "car": {"co2_g": 0.0, "nox_g": 0.0},  # Start with zero for car
-        "motorcycle": {"co2_g": 0.0, "nox_g": 0.0},  # Start with zero for motorcycle
-        "bus": {"co2_g": 0.0, "nox_g": 0.0},  # Start with zero for bus
-        "truck": {"co2_g": 0.0, "nox_g": 0.0},  # Start with zero for truck
-    }
+# --- Step 8: Calculate baseline emissions ---
+# Initialize baseline emissions dictionary
+baseline = {}
 
-    # --- Step 8: Loop through each vehicle type ---
-    for vehicle_type, count in vehicle_counts.items():  # Iterate over vehicle types
-        if count > 0:  # Only calculate if there are vehicles of this type
-            # Get emission factors for this vehicle type
-            factors = EMISSION_FACTORS[vehicle_type]  # Look up CO2 and NOx factors
+# Loop through each vehicle type and calculate emissions
+for vehicle_type, count in total_counts.items():  # For each vehicle type
+    # Emissions = count × distance × emission factor
+    baseline[vehicle_type] = count * TRIP_DISTANCE_KM * EMISSION_FACTORS[vehicle_type]
 
-            # Calculate total emissions = count * factor * distance
-            co2_total = count * factors["co2"] * AVG_TRIP_DISTANCE_KM  # Total CO2 in grams
-            nox_total = count * factors["nox"] * AVG_TRIP_DISTANCE_KM  # Total NOx in grams
+# Calculate total baseline emissions
+baseline["total"] = sum(baseline.values())  # Sum all vehicle type emissions
 
-            # Store results
-            video_emissions[vehicle_type]["co2_g"] = co2_total  # Save CO2
-            video_emissions[vehicle_type]["nox_g"] = nox_total  # Save NOx
+# --- Step 9: Calculate EV scenario emissions ---
+# Initialize EV scenario emissions dictionary
+ev_scenario = {}
 
-            print(f"  {vehicle_type:12s}: {count:3d} vehicles -> CO2: {co2_total:,.0f}g, NOx: {nox_total:.2f}g")
+# Loop through each vehicle type
+for vehicle_type, count in total_counts.items():  # For each vehicle type
+    if vehicle_type == "car":  # Only cars are affected by EV replacement
+        # Calculate number of EVs (30% of cars)
+        ev_count = count * EV_REPLACEMENT_RATE
+        # Calculate remaining ICE cars (70% of cars)
+        ice_count = count - ev_count
+        # EV emissions: ICE cars emit normally, EVs emit 0
+        ev_scenario[vehicle_type] = (ice_count * TRIP_DISTANCE_KM * EMISSION_FACTORS[vehicle_type]) + (ev_count * TRIP_DISTANCE_KM * EV_EMISSION_FACTOR)
+    else:  # Other vehicle types unchanged
+        ev_scenario[vehicle_type] = count * TRIP_DISTANCE_KM * EMISSION_FACTORS[vehicle_type]
 
-    # --- Step 9: Calculate totals for this video ---
-    total_co2 = sum(v["co2_g"] for v in video_emissions.values())  # Sum all CO2
-    total_nox = sum(v["nox_g"] for v in video_emissions.values())  # Sum all NOx
+# Calculate total EV scenario emissions
+ev_scenario["total"] = sum(ev_scenario.values())  # Sum all vehicle type emissions
 
-    # Add totals to the results
-    video_emissions["total"] = {"co2_g": total_co2, "nox_g": total_nox}  # Store totals
+# --- Step 10: Calculate percent reduction ---
+# Reduction = (baseline - ev_scenario) / baseline × 100
+reduction_percent = ((baseline["total"] - ev_scenario["total"]) / baseline["total"]) * 100
 
-    print(f"  {'TOTAL':12s}: CO2: {total_co2:,.0f}g, NOx: {total_nox:.2f}g")
+# --- Step 11: Compile results into output dictionary ---
+results = {
+    "baseline": baseline,  # Baseline emissions by vehicle type
+    "ev_scenario": ev_scenario,  # EV scenario emissions by vehicle type
+    "reduction_percent": round(reduction_percent, 2),  # Percent reduction (rounded to 2 decimal places)
+}
 
-    # Store this video's results
-    emissions_results[video_name] = video_emissions  # Add to master dictionary
-
-# --- Step 10: Save emission results to JSON file ---
+# --- Step 12: Save results to JSON file ---
 with open(OUTPUT_FILE, "w") as f:  # Open output file for writing
-    json.dump(emissions_results, f, indent=2)  # Write results as formatted JSON
+    json.dump(results, f, indent=2)  # Write JSON data with indentation
 
-# --- Step 11: Print final summary ---
-print(f"\n{'='*60}")
-print("EMISSIONS SUMMARY")
-print(f"{'='*60}")
-print(f"Assuming average trip distance: {AVG_TRIP_DISTANCE_KM} km per vehicle")
-print(f"Results saved to: {OUTPUT_FILE}")
-print(f"{'='*60}")
+# --- Step 13: Print summary table to terminal ---
+print("=" * 60)  # Print separator line
+print("EMISSIONS SUMMARY")  # Print title
+print("=" * 60)  # Print separator line
+print(f"Assuming trip distance: {TRIP_DISTANCE_KM} km per vehicle")  # Print distance assumption
+print(f"EV replacement rate: {EV_REPLACEMENT_RATE * 100}% of cars")  # Print EV rate
+print("-" * 60)  # Print separator line
+
+# Print baseline emissions
+print("BASELINE EMISSIONS:")  # Print section header
+for vehicle_type, emission in baseline.items():  # For each vehicle type
+    if vehicle_type != "total":  # Skip total for now
+        print(f"  {vehicle_type:12s}: {emission:8.2f} g CO2")  # Print emission value
+print(f"  {'TOTAL':12s}: {baseline['total']:8.2f} g CO2")  # Print total
+
+print("-" * 60)  # Print separator line
+
+# Print EV scenario emissions
+print("EV SCENARIO EMISSIONS:")  # Print section header
+for vehicle_type, emission in ev_scenario.items():  # For each vehicle type
+    if vehicle_type != "total":  # Skip total for now
+        print(f"  {vehicle_type:12s}: {emission:8.2f} g CO2")  # Print emission value
+print(f"  {'TOTAL':12s}: {ev_scenario['total']:8.2f} g CO2")  # Print total
+
+print("-" * 60)  # Print separator line
+print(f"REDUCTION: {reduction_percent:.2f}%")  # Print percent reduction
+print("=" * 60)  # Print separator line
+print(f"Results saved to: {OUTPUT_FILE}")  # Print output file path
