@@ -10,6 +10,7 @@ import streamlit as st  # For creating the web dashboard
 import json  # For reading JSON data files
 import os  # For file path operations
 import pandas as pd  # For creating data tables
+import subprocess  # For running detect.py from within the app
 
 # --- Step 2: Configure the Streamlit page ---
 st.set_page_config(
@@ -35,7 +36,7 @@ with st.sidebar:  # Work inside the sidebar
     st.markdown("3. Calculate emissions")  # Step 3
     st.markdown("4. Visualize on map")  # Step 4
     st.markdown("---")  # Separator line
-    st.markdown("PhD Portfolio Project")  # Footer text
+    st.markdown("Portfolio Project")  # Footer text
 
 # --- Step 4: Define file paths ---
 COUNTS_FILE = os.path.join("output", "all_counts.json")  # Vehicle counts
@@ -70,20 +71,39 @@ with tab1:  # Work inside the first tab
     st.subheader("Annotated Video")  # Tab section title
     st.markdown("This tab shows traffic videos with detected vehicles highlighted by bounding boxes, class labels, and tracking IDs.")  # Caption
 
-    # Check if video directory exists
+    # Check if video directory exists and has videos
+    video_files = []
     if os.path.exists(VIDEO_DIR):  # If annotated videos directory exists
         # Get list of video files
         video_files = [f for f in os.listdir(VIDEO_DIR) if f.endswith((".mp4", ".avi", ".mov"))]  # Filter video files
-        if video_files:  # If video files found
-            # Let user select a video
-            selected_video = st.selectbox("Select a video:", video_files)  # Dropdown to select video
-            video_path = os.path.join(VIDEO_DIR, selected_video)  # Full path to selected video
-            st.video(video_path)  # Play the selected video
-            st.caption(f"Showing: {selected_video}")  # Show selected video name
-        else:
-            st.warning("No annotated videos found in output/annotated_videos/")  # Warning if no videos
+
+    if video_files:  # If video files found
+        # Let user select a video
+        selected_video = st.selectbox("Select a video:", video_files)  # Dropdown to select video
+        video_path = os.path.join(VIDEO_DIR, selected_video)  # Full path to selected video
+        st.video(video_path)  # Play the selected video
+        st.caption(f"Showing: {selected_video}")  # Show selected video name
     else:
-        st.warning("output/annotated_videos/ not found. Run detect.py first to generate annotated videos.")  # Warning if directory missing
+        # Show message and button to run detection
+        st.info("No annotated videos found. Click the button below to run vehicle detection.")
+        if st.button("Run Detection"):
+            with st.spinner("Running detection... This may take a few minutes."):
+                try:
+                    # Run detect.py using the same Python executable
+                    result = subprocess.run(
+                        ["python", "detect.py"],
+                        capture_output=True,
+                        text=True,
+                        timeout=600  # 10 minute timeout
+                    )
+                    if result.returncode == 0:
+                        st.success("Detection complete! Refresh the page to see annotated videos.")
+                    else:
+                        st.error(f"Detection failed: {result.stderr}")
+                except subprocess.TimeoutExpired:
+                    st.error("Detection timed out. Please run detect.py manually.")
+                except Exception as e:
+                    st.error(f"Error running detection: {str(e)}")
 
 # ==================== TAB 2: Emission Counts ====================
 with tab2:  # Work inside the second tab
@@ -205,4 +225,4 @@ with tab4:  # Work inside the fourth tab
 
 # --- Step 8: Add footer ---
 st.markdown("---")  # Separator line
-st.caption("Author: Hafsa | PhD Portfolio Project | Vision-Based Vehicle Detection for Street-Level Emissions Mapping")  # Footer text
+st.caption("Author: Hafsa | Portfolio Project | Vision-Based Vehicle Detection for Street-Level Emissions Mapping")  # Footer text
