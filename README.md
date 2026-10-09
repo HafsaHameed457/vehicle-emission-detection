@@ -1,129 +1,151 @@
 # Vision-Based Vehicle Detection for Street-Level Emissions Mapping
 
-## Overview
+## Motivation
 
-This project detects vehicles in traffic videos using YOLO (You Only Look Once) deep learning, estimates CO2 and NOx emissions based on vehicle class, and visualizes the results on an interactive map and dashboard.
+Urban transport is a major contributor to greenhouse gas emissions and air pollution. Traditional emissions models rely on aggregate traffic data and cannot capture street-level variations. This project demonstrates how computer vision and deep learning can be used to detect individual vehicles in traffic videos and estimate emissions at a granular level, enabling more targeted urban planning and sustainability interventions.
 
-## Features
+## What This Project Does
 
-- **Vehicle Detection**: Uses YOLOv8 to detect and track cars, motorcycles, buses, and trucks in traffic videos
-- **Emissions Estimation**: Calculates CO2 and NOx emissions based on vehicle class and average trip distance
-- **Interactive Map**: Folium heatmap showing emission hotspots across different locations
-- **Streamlit Dashboard**: Web-based interface for exploring vehicle counts, emissions data, and the map
+- Detects vehicles (cars, motorcycles, buses, trucks) in traffic videos using YOLOv8
+- Tracks vehicles across video frames to avoid double-counting
+- Estimates CO2 emissions based on vehicle class and distance travelled
+- Simulates an EV adoption scenario and calculates emission reductions
+- Visualizes emissions on an interactive map with grid-based spatial distribution
+- Provides a Streamlit dashboard for exploring results
 
-## Project Structure
+## Pipeline Overview
 
 ```
-vision-based-vehicle-detection-for-street-level-emission/
-├── data/                    # Input traffic videos (7 videos)
-├── output/
-│   ├── annotated_videos/    # Videos with bounding boxes and tracking IDs
-│   ├── all_counts.json      # Vehicle counts per video
-│   ├── emissions.json       # CO2/NOx emissions per video
-│   └── emissions_map.html   # Interactive Folium heatmap
-├── detect.py                # Main detection/tracking/counting pipeline
-├── emissions.py             # Emissions calculation from vehicle counts
-├── map.py                   # Folium heatmap generation
-├── app.py                   # Streamlit dashboard
-├── requirements.txt         # Python dependencies
-└── README.md                # This file
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│  Traffic Videos │────▶│  YOLOv8 Detect  │────▶│  Vehicle Counts │
+│  (data/)        │     │  + Track        │     │  (JSON)         │
+└─────────────────┘     └─────────────────┘     └────────┬────────┘
+                                                         │
+                                                         ▼
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│  Interactive    │◀────│  Folium Map     │◀────│  Emissions      │
+│  Dashboard      │     │  (Grid + Layers)│     │  (Baseline/EV)  │
+│  (Streamlit)    │     │                 │     │                 │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
 ```
 
-## Setup
+## Technical Stack
 
-### Prerequisites
+| Tool | Purpose |
+|------|---------|
+| Python 3.12 | Programming language |
+| YOLOv8 (Ultralytics) | Object detection and tracking |
+| OpenCV | Video processing |
+| Folium | Interactive maps |
+| Streamlit | Web dashboard |
+| Pandas | Data manipulation |
+| NumPy | Numerical operations |
 
-- Python 3.12 (3.14 may cause DLL errors with PyTorch)
-- Windows OS
+## Emission Factors Used
 
-### Installation
+| Vehicle Class | CO2 (g/km) | Source |
+|---------------|-----------|--------|
+| Car | 147 | EPA average passenger vehicle |
+| Bus | 1071 | EPA average transit bus |
+| Truck | 800 | EPA average heavy-duty truck |
+| Motorcycle | 120 | EPA average motorcycle |
 
-1. Create a virtual environment:
-   ```powershell
-   python -m venv venv
-   ```
+**Assumption:** Each vehicle travels 0.1 km within camera view.
 
-2. Activate the virtual environment:
-   ```powershell
-   venv\Scripts\activate
-   ```
+## Key Features
 
-3. Install dependencies:
-   ```powershell
-   pip install -r requirements.txt
-   ```
-
-## Usage
-
-### Step 1: Run Vehicle Detection
-
-Processes all videos in the `data/` folder, detects vehicles using YOLOv8, tracks them across frames, and saves annotated videos and JSON counts.
-
-```powershell
-venv\Scripts\python.exe detect.py
-```
-
-**Output:**
-- `output/annotated_videos/` — Videos with bounding boxes and tracking IDs
-- `output/all_counts.json` — Vehicle counts per video
-
-### Step 2: Calculate Emissions
-
-Reads vehicle counts and calculates CO2/NOx emissions based on emission factors.
-
-```powershell
-venv\Scripts\python.exe emissions.py
-```
-
-**Output:**
-- `output/emissions.json` — CO2 and NOx emissions per video
-
-### Step 3: Generate Interactive Map
-
-Creates a Folium heatmap showing emission hotspots.
-
-```powershell
-venv\Scripts\python.exe map.py
-```
-
-**Output:**
-- `output/emissions_map.html` — Interactive heatmap (open in browser)
-
-### Step 4: Launch Dashboard
-
-Starts the Streamlit web dashboard.
-
-```powershell
-venv\Scripts\streamlit run app.py
-```
-
-**Access:** http://localhost:8501
-
-## Vehicle Classes & Emission Factors
-
-| Class | CO2 (g/km) | NOx (g/km) |
-|-------|-----------|-----------|
-| Car | 120 | 0.05 |
-| Motorcycle | 80 | 0.015 |
-| Bus | 650 | 0.55 |
-| Truck | 800 | 1.0 |
-
-**Assumption:** Average trip distance of 5 km per vehicle.
-
-## Technology Stack
-
-- **YOLOv8** (Ultralytics) — Object detection and tracking
-- **OpenCV** — Video processing
-- **Folium** — Interactive maps
-- **Streamlit** — Web dashboard
-- **Pandas/NumPy** — Data processing
+- Real-time vehicle detection and tracking with YOLOv8
+- Support for 4 vehicle classes: car, motorcycle, bus, truck
+- Emissions calculation with baseline and EV scenario comparison
+- Interactive Folium map with color-coded grid cells
+- Layer control to toggle between scenarios
+- Streamlit dashboard with 4 tabs for comprehensive visualization
+- Graceful handling of missing files
 
 ## Limitations
 
 - Detection accuracy depends on video quality, lighting, and occlusion
 - Emission factors are simplified averages (real-world values vary by vehicle age, fuel type, driving conditions)
-- GPS coordinates are placeholder values (in a real project, these would come from video metadata or manual input)
+- GPS coordinates are placeholder values (in a real project, these would come from video metadata)
 - Short video clips may not represent continuous traffic flow
+- Grid-based spatial distribution is simulated, not based on actual camera locations
+- Only CO2 is estimated; other pollutants (NOx, PM) are not included
+
+## Relevance to Research
+
+This project connects to urban emissions modelling and digital twin research by:
+
+- Demonstrating how computer vision can provide granular, street-level emissions data
+- Enabling scenario analysis (e.g., EV adoption) for policy evaluation
+- Providing a framework for integrating real-time traffic data into urban digital twins
+- Supporting research on sustainable transport and smart city initiatives
+
+## How to Run
+
+### Prerequisites
+
+- Python 3.12 (3.14 may cause DLL errors with PyTorch)
+- Windows, Mac, or Linux
+
+### Setup
+
+```powershell
+# Clone the repository
+git clone https://github.com/yourusername/vision-based-vehicle-detection.git
+cd vision-based-vehicle-detection
+
+# Create virtual environment
+python -m venv venv
+
+# Activate virtual environment
+venv\Scripts\activate  # Windows
+source venv/bin/activate  # Mac/Linux
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+### Run the Pipeline
+
+```powershell
+# Step 1: Detect vehicles in all videos
+python detect.py
+
+# Step 2: Calculate emissions
+python emissions.py
+
+# Step 3: Generate interactive map
+python map.py
+
+# Step 4: Launch dashboard
+streamlit run app.py
+```
+
+## File Structure
+
+```
+vision-based-vehicle-detection/
+├── data/                      # Input traffic videos
+├── output/
+│   ├── annotated_videos/      # Videos with bounding boxes and tracking IDs
+│   ├── all_counts.json        # Vehicle counts per video
+│   ├── emissions.json         # CO2 emissions (baseline + EV scenario)
+│   └── emissions_map.html     # Interactive Folium map
+├── detect.py                  # Vehicle detection and tracking
+├── emissions.py               # Emissions calculation
+├── map.py                     # Map generation
+├── app.py                     # Streamlit dashboard
+├── requirements.txt           # Python dependencies
+└── README.md                  # This file
+```
+
+## Sample Output
+
+- **Annotated Videos**: Videos with bounding boxes around detected vehicles, class labels, and tracking IDs
+- **Counts JSON**: Vehicle counts per video (e.g., `{"car": 25, "bus": 3, "truck": 5}`)
+- **Emissions JSON**: Baseline and EV scenario emissions with percent reduction
+- **Interactive Map**: Folium map with color-coded circle markers showing emission intensity
+- **Dashboard**: Streamlit app with 4 tabs for video, counts, map, and scenario comparison
 
 ## Future Work
 
@@ -132,3 +154,15 @@ venv\Scripts\streamlit run app.py
 - Use more accurate emission models (COPERT, MOVES)
 - Deploy as a web service with live camera feeds
 - Add temporal analysis (emissions by time of day)
+- Include other pollutants (NOx, PM2.5)
+- Add user input for custom emission factors and scenarios
+
+## Author
+
+**Hafsa**
+- LinkedIn: [your-linkedin-profile]
+- Portfolio: [your-portfolio-website]
+
+## License
+
+MIT License — feel free to use this project for research and educational purposes.
