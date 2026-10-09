@@ -1,7 +1,7 @@
 # app.py — Streamlit dashboard for the Vehicle Emissions project
 # This script creates an interactive web dashboard showing:
 # - Vehicle counts per video
-# - Estimated emissions (CO2 and NOx)
+# - Estimated emissions (Baseline vs EV Scenario)
 # - Interactive map of emissions by location
 
 # --- Step 1: Import required libraries ---
@@ -9,13 +9,11 @@ import streamlit as st  # For creating the web dashboard
 import json  # For reading JSON data files
 import os  # For file path operations
 import pandas as pd  # For creating data tables
-import folium  # For the map (rendered via streamlit-folium)
-from streamlit_folium import st_folium  # For embedding Folium maps in Streamlit
 
 # --- Step 2: Configure the Streamlit page ---
 st.set_page_config(
     page_title="Vehicle Emissions Dashboard",  # Browser tab title
-    page_icon="🚗",  # Browser tab icon
+    page_icon="car",  # Browser tab icon
     layout="wide",  # Use full page width
 )
 
@@ -42,7 +40,7 @@ def load_data():
 counts, emissions = load_data()  # Call the load function
 
 # --- Step 6: Create the dashboard title ---
-st.title("🚗 Vision-Based Vehicle Detection for Street-Level Emissions")
+st.title("Vision-Based Vehicle Detection for Street-Level Emissions")
 st.markdown("---")  # Horizontal line separator
 
 # --- Step 7: Create two columns for layout ---
@@ -50,7 +48,7 @@ col1, col2 = st.columns(2)  # Split page into 2 equal columns
 
 # --- Step 8: Left column — Vehicle Counts ---
 with col1:  # Work inside the left column
-    st.subheader("📊 Vehicle Counts")  # Section title
+    st.subheader("Vehicle Counts")  # Section title
 
     # Create a list to hold table data
     table_data = []  # Empty list for table rows
@@ -76,24 +74,40 @@ with col1:  # Work inside the left column
 
 # --- Step 9: Right column — Emissions ---
 with col2:  # Work inside the right column
-    st.subheader("💨 Estimated Emissions")  # Section title
+    st.subheader("Estimated Emissions (CO2)")  # Section title
 
-    # Create a list to hold emissions table data
+    # Get baseline and ev_scenario data
+    baseline = emissions.get("baseline", {})  # Baseline emissions
+    ev_scenario = emissions.get("ev_scenario", {})  # EV scenario emissions
+
+    # Create emissions comparison table
     emissions_table = []  # Empty list for emissions rows
 
-    # Loop through each video
-    for video_name, emission_data in emissions.items():  # Iterate over videos
-        # Get totals
-        total_co2 = emission_data.get("total", {}).get("co2_g", 0)  # Total CO2
-        total_nox = emission_data.get("total", {}).get("nox_g", 0)  # Total NOx
+    # Define vehicle types to display
+    vehicle_types = ["car", "bus", "truck", "motorcycle"]  # All vehicle types
+
+    # Loop through each vehicle type
+    for vt in vehicle_types:  # For each vehicle type
+        # Get baseline and EV values for this vehicle type
+        baseline_val = baseline.get(vt, 0)  # Baseline emissions
+        ev_val = ev_scenario.get(vt, 0)  # EV scenario emissions
 
         # Create a row
         row = {
-            "Video": video_name,  # Video filename
-            "CO2 (kg)": round(total_co2 / 1000, 2),  # Convert g to kg
-            "NOx (g)": round(total_nox, 2),  # NOx in grams
+            "Vehicle Type": vt.capitalize(),  # Vehicle type name
+            "Baseline (g)": round(baseline_val, 2),  # Baseline emissions
+            "EV Scenario (g)": round(ev_val, 2),  # EV scenario emissions
+            "Reduction (g)": round(baseline_val - ev_val, 2),  # Reduction amount
         }
         emissions_table.append(row)  # Add row
+
+    # Add total row
+    emissions_table.append({
+        "Vehicle Type": "TOTAL",  # Total label
+        "Baseline (g)": round(baseline.get("total", 0), 2),  # Total baseline
+        "EV Scenario (g)": round(ev_scenario.get("total", 0), 2),  # Total EV
+        "Reduction (g)": round(baseline.get("total", 0) - ev_scenario.get("total", 0), 2),  # Total reduction
+    })
 
     # Convert to DataFrame
     df_emissions = pd.DataFrame(emissions_table)  # Create pandas DataFrame
@@ -103,28 +117,32 @@ with col2:  # Work inside the right column
 
 # --- Step 10: Summary statistics ---
 st.markdown("---")  # Separator
-st.subheader("📈 Summary Statistics")  # Section title
+st.subheader("Summary Statistics")  # Section title
 
 # Calculate totals across all videos
 total_vehicles = sum(sum(v.values()) for v in counts.values())  # All vehicles
-total_co2_all = sum(e.get("total", {}).get("co2_g", 0) for e in emissions.values())  # All CO2
-total_nox_all = sum(e.get("total", {}).get("nox_g", 0) for e in emissions.values())  # All NOx
+total_baseline = emissions.get("baseline", {}).get("total", 0)  # Total baseline CO2
+total_ev = emissions.get("ev_scenario", {}).get("total", 0)  # Total EV CO2
+reduction_pct = emissions.get("reduction_percent", 0)  # Percent reduction
 
 # Create three metric columns
-m1, m2, m3 = st.columns(3)  # Three equal columns for metrics
+m1, m2, m3, m4 = st.columns(4)  # Four equal columns for metrics
 
 with m1:  # First metric
     st.metric("Total Vehicles", f"{total_vehicles}")  # Show total vehicles
 
 with m2:  # Second metric
-    st.metric("Total CO2", f"{total_co2_all/1000:.1f} kg")  # Show total CO2 in kg
+    st.metric("Baseline CO2", f"{total_baseline/1000:.2f} kg")  # Show total baseline CO2
 
 with m3:  # Third metric
-    st.metric("Total NOx", f"{total_nox_all:.1f} g")  # Show total NOx in grams
+    st.metric("EV Scenario CO2", f"{total_ev/1000:.2f} kg")  # Show total EV CO2
+
+with m4:  # Fourth metric
+    st.metric("Reduction", f"{reduction_pct:.1f}%")  # Show percent reduction
 
 # --- Step 11: Map section ---
 st.markdown("---")  # Separator
-st.subheader("🗺️ Emissions Map")  # Section title
+st.subheader("Emissions Map")  # Section title
 
 # Check if map file exists
 if os.path.exists(MAP_FILE):  # If map HTML file exists
